@@ -3,6 +3,8 @@ signal near target position
 
 ## TODO
 
+* image
+
 * test or real hardware
 
 * make delay or hysteresis so range borders not lead to souds

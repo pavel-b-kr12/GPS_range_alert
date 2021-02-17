@@ -13,6 +13,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
 import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.media.ToneGenerator;
 import android.net.Uri;
 import android.os.Bundle;
@@ -53,6 +54,10 @@ import com.karumi.dexter.listener.PermissionGrantedResponse;
 import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.single.PermissionListener;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.text.DateFormat;
 import java.util.Date;
 
@@ -69,6 +74,8 @@ public class MainActivity extends AppCompatActivity {
 
     @BindView(R.id.location_result)
     TextView txtLocationResult;
+    @BindView(R.id.textView_load_target)
+    TextView textView_load_target;
 
     @BindView(R.id.TargetLocationLat)
     TextView txtTargetLocationLat;
@@ -108,28 +115,44 @@ public class MainActivity extends AppCompatActivity {
     private LocationRequest mLocationRequest;
     private LocationSettingsRequest mLocationSettingsRequest;
     private LocationCallback mLocationCallback;
-    private Location mCurrentLocation;
-    private Location target_location;
+    private Location location_current;
+    private Location location_target;
+    public void setLocation_current(Location location_current) {
+        this.location_current = location_current;
+        distance_calc();
+    }
+
+    public void setLocation_target(Location location_target) {
+        this.location_target = location_target;
+        distance_calc();
+
+    }
     private float range0;
     private float range1;
     private float distance_current_to_target=-1;
-
 
     // boolean flag to toggle the ui
     private Boolean mRequestingLocationUpdates;
     private int inRange=9;
 
+    void distance_calc()
+    {
+        if(location_target !=null && location_current!=null)
+            distance_current_to_target= location_current.distanceTo (location_target);
+        else distance_current_to_target=-1;
+        updateLocationUI();
+    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
 
-        // initialize the necessary libraries
-        init();
+        init(); // initialize the necessary libraries
 
-        // restore the values from saved instance state
         restoreValuesFromBundle(savedInstanceState);
+
+        verifyStoragePermissions(this); //and next load 1st file async
     }
 
     private void init() {
@@ -141,11 +164,11 @@ public class MainActivity extends AppCompatActivity {
             public void onLocationResult(LocationResult locationResult) {
                 super.onLocationResult(locationResult);
                 // location is received
-                mCurrentLocation = locationResult.getLastLocation();
+                setLocation_current(locationResult.getLastLocation());
                 mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
 
-                if(target_location!=null)
-                distance_current_to_target=mCurrentLocation.distanceTo (target_location);
+
+
                 updateLocationUI();
             }
         };
@@ -160,8 +183,6 @@ public class MainActivity extends AppCompatActivity {
         LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder();
         builder.addLocationRequest(mLocationRequest);
         mLocationSettingsRequest = builder.build();
-
-
 //------------------------------
         //final TextView t1=new TextView(this);
         seekBar1=(SeekBar) findViewById(R.id.seekBar1);
@@ -207,24 +228,76 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * Restoring values from saved instance state
-     */
+
+    String target_file_nm="2021-02-15"; // .txt and other = access deny
+    String target_file_nm_mp3=null;
+    String target_file_dir="/storage/emulated/0/Download/GPS_range_alert_targets/";
+    private void target_file_nm_load() { // arrived to target     ///storage/sdcard0/
+        //play target mp3 and load next file
+        if(target_file_nm_mp3!=null) {
+            if (new File(target_file_nm_mp3).exists()) {
+                if (mediaPlayer == null) mediaPlayer = new MediaPlayer();
+                try {
+                    if(mediaPlayer.isPlaying()) {
+                        mediaPlayer.stop();
+                        mediaPlayer.reset();
+                    }
+                    mediaPlayer.setDataSource(target_file_nm_mp3);
+                    mediaPlayer.prepare();
+                    mediaPlayer.start();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    mediaPlayer.reset();
+                }
+            } else textView_load_target.setText("no " + target_file_nm_mp3);
+        }
+
+        File file = new File(target_file_dir+target_file_nm+".png");
+        target_file_nm_mp3=target_file_dir+target_file_nm+".mp3";
+        StringBuilder text = new StringBuilder();
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(file));
+
+            String[] arr  = br.readLine().split("\t");
+            //textView_load_target.setText(file.getParentFile().getAbsolutePath()+" "+arr[0]+" "+ arr[1]);
+            textView_load_target.setText(arr[0]+" "+ arr[1]);
+            if(arr[0].length()!=0) {
+                parseLatLon_set_target_loc(arr[0]);
+            }
+            target_file_nm=arr[1];
+
+            /*
+            String line;
+            while ((line = br.readLine()) != null) {
+                text.append(line);
+                text.append('\n');
+            }
+            */
+            br.close();
+        }
+        catch (IOException e) {
+            textView_load_target.setText("no "+file.getAbsolutePath());
+        }
+    }
+
+    MediaPlayer mediaPlayer=null;
+
     private void restoreValuesFromBundle(Bundle savedInstanceState) {
         if (savedInstanceState != null) {
             if (savedInstanceState.containsKey("is_requesting_updates"))
                 mRequestingLocationUpdates = savedInstanceState.getBoolean("is_requesting_updates");
 
             if (savedInstanceState.containsKey("last_known_location"))
-                mCurrentLocation = savedInstanceState.getParcelable("last_known_location");
+                setLocation_current( savedInstanceState.getParcelable("last_known_location"));
 
             if (savedInstanceState.containsKey("target_location"))
-                target_location = savedInstanceState.getParcelable("target_location");
+                setLocation_target ( savedInstanceState.getParcelable("target_location"));
             else
             {
-                target_location = new Location("");
-                target_location.setLatitude(50.4547d); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
-                target_location.setLongitude(30.5238d);
+                Location t = new Location("");
+                t.setLatitude(50.4547d); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
+                t.setLongitude(30.5238d);
+                setLocation_target (t);
             }
 
             if (savedInstanceState.containsKey("range0")) {
@@ -240,9 +313,10 @@ public class MainActivity extends AppCompatActivity {
         }
         else
         {
-            target_location = new Location("");
-            target_location.setLatitude(50.4547d); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
-            target_location.setLongitude(30.5238d);
+            Location t = new Location("");
+            t.setLatitude(50.4547d); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
+            t.setLongitude(30.5238d);
+            setLocation_target (t);
             range0=20;
             range1=100;
         }
@@ -252,27 +326,33 @@ public class MainActivity extends AppCompatActivity {
         updateLocationUI();
     }
 
-
+void location_current_display()
+{
+    if (location_current != null) {
+        txtLocationResult.setText(
+                "Lat: " + location_current.getLatitude() + ", " + "Lon: " + location_current.getLongitude()
+        );
+        // giving a blink animation on TextView
+        txtLocationResult.setAlpha(0);
+        txtLocationResult.animate().alpha(1).setDuration(300);
+        // location last updated time
+        txtUpdatedOn.setText("Last updated on: " + mLastUpdateTime);
+    }
+}
+void location_target_display()
+{
+    txtTargetLocationLat.setText( Double.toString(location_target.getLatitude()));
+    txtTargetLocationLon.setText( Double.toString(location_target.getLongitude()));
+}
     /**
      * Update the UI displaying the location data
      * and toggling the buttons
      */
     private void updateLocationUI() {
-        if (mCurrentLocation != null) {
-            txtLocationResult.setText(
-                    "Lat: " + mCurrentLocation.getLatitude() + ", " + "Lon: " + mCurrentLocation.getLongitude()
-            );
-            // giving a blink animation on TextView
-            txtLocationResult.setAlpha(0);
-            txtLocationResult.animate().alpha(1).setDuration(300);
-            // location last updated time
-            txtUpdatedOn.setText("Last updated on: " + mLastUpdateTime);
-        }
+        location_current_display();
+        location_target_display();
 
-            txtTargetLocationLat.setText( Double.toString(target_location.getLatitude()));
-            txtTargetLocationLon.setText( Double.toString(target_location.getLongitude()));
-
-            distance_current_to_target_el.setText("dist: " + (distance_current_to_target==-1?"?":Double.toString(distance_current_to_target)) + ", ranges:" + range0 + " | " + range1);
+        distance_current_to_target_el.setText("dist: " + (distance_current_to_target==-1?"?":Double.toString(distance_current_to_target)) + ", ranges:" + range0 + " | " + range1);
         if(distance_current_to_target!=-1) {
                 if (distance_current_to_target < range0) {
                     if (inRange != 0) {
@@ -280,6 +360,7 @@ public class MainActivity extends AppCompatActivity {
                         distance_current_to_target_el.setTextColor(Color.RED);
                         ToneGenerator toneG = new ToneGenerator(AudioManager.STREAM_ALARM, 50);
                         toneG.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 2000);
+                        target_file_nm_load();
                     }
                 } else if (distance_current_to_target < range1) {
                     if (inRange != 1) {
@@ -305,10 +386,10 @@ public class MainActivity extends AppCompatActivity {
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putBoolean("is_requesting_updates", mRequestingLocationUpdates);
-        outState.putParcelable("last_known_location", mCurrentLocation);
-        outState.putParcelable("target_location", mCurrentLocation);
-        outState.putParcelable("range0", mCurrentLocation);
-        outState.putParcelable("range1", mCurrentLocation);
+        outState.putParcelable("last_known_location", location_current);
+        outState.putParcelable("target_location", location_current);
+        outState.putParcelable("range0", location_current);
+        outState.putParcelable("range1", location_current);
         outState.putString("last_updated_on", mLastUpdateTime);
 
     }
@@ -424,17 +505,23 @@ public class MainActivity extends AppCompatActivity {
 
     @OnClick(R.id.btn_get_last_location)
     public void showLastKnownLocation() {
-        if (mCurrentLocation != null) {
-            Toast.makeText(getApplicationContext(), "Lat: " + mCurrentLocation.getLatitude()
-                    + ", Lng: " + mCurrentLocation.getLongitude(), Toast.LENGTH_LONG).show();
+        if (location_current != null) {
+            Toast.makeText(getApplicationContext(), "Lat: " + location_current.getLatitude()
+                    + ", Lng: " + location_current.getLongitude(), Toast.LENGTH_LONG).show();
         } else {
             Toast.makeText(getApplicationContext(), "Last known location is not available!", Toast.LENGTH_SHORT).show();
         }
     }
-    @OnClick(R.id.btn_set_target_location)
+    @OnClick(R.id.btn_loc_from_target)
+    public void loc_from_target() {
+        if(location_target!=null) {
+            setLocation_current( new Location(location_target));
+        }
+    }
+    @OnClick(R.id.btn_set_target_location_from_current)
     public void setTarget_location() {
-        if (mCurrentLocation != null) {
-            target_location=new Location(mCurrentLocation);
+        if (location_current != null) {
+            setLocation_target ( new Location(location_current));
         }
     }
 
@@ -508,14 +595,51 @@ public class MainActivity extends AppCompatActivity {
             ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
             // Gets the clipboard as text.
             pasteData = item.getText().toString();
-            try {
-                String[] arr = pasteData.split("[:,;/]");
-                target_location = new Location("");
-                target_location.setLatitude(Float.parseFloat(arr[0])); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
-                target_location.setLongitude(Float.parseFloat(arr[1]));
-            } catch (NumberFormatException e) {
-                e.printStackTrace();
-            }
+            parseLatLon_set_target_loc(pasteData);
+        }
+    }
+void parseLatLon_set_target_loc(String pasteData) {
+    try {
+        String[] arr = pasteData.split("[:,;/]");
+        Location t = new Location("");
+        t.setLatitude(Float.parseFloat(arr[0])); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
+        t.setLongitude(Float.parseFloat(arr[1]));
+        setLocation_target (t);
+    } catch (NumberFormatException e) {
+        e.printStackTrace();
+    }
+}
+
+
+//====================================
+// Storage Permissions
+    private static final int REQUEST_EXTERNAL_STORAGE = 1;
+    private static String[] PERMISSIONS_STORAGE = {
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+    };
+
+    /**
+     * Checks if the app has permission to write to device storage
+     *
+     * If the app does not has permission then the user will be prompted to grant permissions
+     *
+     * @param activity
+     */
+    public  void verifyStoragePermissions(Activity activity) {
+        // Check if we have write permission
+        int permission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+
+        if (permission == PackageManager.PERMISSION_GRANTED) {
+            target_file_nm_load();
+        }
+        else{
+            // We don't have permission so prompt the user
+            ActivityCompat.requestPermissions(
+                    activity,
+                    PERMISSIONS_STORAGE,
+                    REQUEST_EXTERNAL_STORAGE
+            );
         }
     }
 }
