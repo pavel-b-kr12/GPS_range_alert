@@ -74,15 +74,15 @@
 
             <Button
                 android:id="@+id/btn_get_last_location"
-                android:layout_width="190dp"
+                android:layout_width="236dp"
                 android:layout_height="32dp"
-                android:text="@string/get_last_location"
+                android:text="get_last_location or set for test "
                 android:textAlignment="center"
                 android:textSize="10sp" />
 
             <Button
                 android:id="@+id/btn_loc_from_target"
-                android:layout_width="190dp"
+                android:layout_width="159dp"
                 android:layout_height="32dp"
                 android:text="from target"
                 android:textAlignment="center"

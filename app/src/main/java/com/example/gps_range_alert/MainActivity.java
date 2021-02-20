@@ -59,13 +59,18 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.text.DateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 
 public class MainActivity extends AppCompatActivity {
+    boolean bHideDebugElements=true; //hide all except start button
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
@@ -137,11 +142,48 @@ public class MainActivity extends AppCompatActivity {
 
     void distance_calc()
     {
-        if(location_target !=null && location_current!=null)
-            distance_current_to_target= location_current.distanceTo (location_target);
-        else distance_current_to_target=-1;
+        //point chain mode
+        if(target_file_nm!=null) {
+            if (location_target != null && location_current != null)
+                distance_current_to_target = location_current.distanceTo(location_target);
+            else distance_current_to_target = -1;
+        }
+
+        //check all points mode
+        final int size = target_locations_to_check_each.size();
+        for (int i=0;i<size;i++) {
+            float distance = location_current.distanceTo(target_locations_to_check_each.get(i));
+            if(distance<50) target_reached(i);
+        }
+
+
+        toggleButtons();
+
+
         updateLocationUI();
     }
+    int target_multi_last_reached=-1;
+    private void target_reached(int i) {
+        if(i!=target_multi_last_reached || (mediaPlayer!=null && !mediaPlayer.isPlaying())) //play if last was different or playback is over //TODO range histeresis
+        {
+            target_multi_last_reached=i;
+            String mp3_nm = target_locations_to_check_each_mp3_nm.get(i);
+            if (mediaPlayer == null) mediaPlayer = new MediaPlayer();
+            try {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                    mediaPlayer.reset();
+                }
+                mediaPlayer.setDataSource(target_file_dir+ mp3_nm);
+                mediaPlayer.prepare();
+                mediaPlayer.start();
+            } catch (Exception e) {
+                e.printStackTrace();
+                mediaPlayer.reset();
+            }
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -226,45 +268,69 @@ public class MainActivity extends AppCompatActivity {
                 updateLocationUI();
             }
         });
+
+        if(bHideDebugElements)
+        {
+            seekBar2.setVisibility(View.GONE);
+            seekBar1.setVisibility(View.GONE);
+            findViewById(R.id.btn_loc_from_target).setVisibility(View.GONE);
+            findViewById(R.id.btn_get_last_location).setVisibility(View.GONE);
+            findViewById(R.id.btn_pasteLatLon).setVisibility(View.GONE);
+            findViewById(R.id.btn_set_target_location_from_current).setVisibility(View.GONE);
+            //txtLocationResult.setVisibility(View.GONE);
+            textView_load_target.setVisibility(View.GONE);
+            txtTargetLocationLat.setVisibility(View.GONE);
+            txtTargetLocationLon.setVisibility(View.GONE);
+            distance_current_to_target_el.setVisibility(View.GONE);
+            txtUpdatedOn.setVisibility(View.GONE);
+            //btnStartUpdates.setVisibility(View.GONE);
+            btnStopUpdates.setVisibility(View.GONE);
+
+        }
     }
 
-
-    String target_file_nm="2021-02-15"; // .txt and other = access deny
-    String target_file_nm_mp3=null;
     String target_file_dir="/storage/emulated/0/Download/GPS_range_alert_targets/";
+    String target_file_nm="2021-02-15"; // .txt and other = access deny //set this to null to disable point chain mode
+    String target_file_nm_mp3=null;
+
+    List<String> target_locations_to_check_each_mp3_nm = new ArrayList<String>();
+    List<Location> target_locations_to_check_each = new ArrayList<Location>();
+
+
     private void target_file_nm_load() { // arrived to target     ///storage/sdcard0/
-        //play target mp3 and load next file
-        if(target_file_nm_mp3!=null) {
-            if (new File(target_file_nm_mp3).exists()) {
-                if (mediaPlayer == null) mediaPlayer = new MediaPlayer();
-                try {
-                    if(mediaPlayer.isPlaying()) {
-                        mediaPlayer.stop();
+        if(target_file_nm!=null) {
+            //play target mp3 and load next file
+            if (target_file_nm_mp3 != null) {
+                if (new File(target_file_nm_mp3).exists()) {
+                    if (mediaPlayer == null) mediaPlayer = new MediaPlayer();
+                    try {
+                        if (mediaPlayer.isPlaying()) {
+                            mediaPlayer.stop();
+                            mediaPlayer.reset();
+                        }
+                        mediaPlayer.setDataSource(target_file_nm_mp3);
+                        mediaPlayer.prepare();
+                        mediaPlayer.start();
+                    } catch (Exception e) {
+                        e.printStackTrace();
                         mediaPlayer.reset();
                     }
-                    mediaPlayer.setDataSource(target_file_nm_mp3);
-                    mediaPlayer.prepare();
-                    mediaPlayer.start();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    mediaPlayer.reset();
-                }
-            } else textView_load_target.setText("no " + target_file_nm_mp3);
-        }
-
-        File file = new File(target_file_dir+target_file_nm+".png");
-        target_file_nm_mp3=target_file_dir+target_file_nm+".mp3";
-        StringBuilder text = new StringBuilder();
-        try {
-            BufferedReader br = new BufferedReader(new FileReader(file));
-
-            String[] arr  = br.readLine().split("\t");
-            //textView_load_target.setText(file.getParentFile().getAbsolutePath()+" "+arr[0]+" "+ arr[1]);
-            textView_load_target.setText(arr[0]+" "+ arr[1]);
-            if(arr[0].length()!=0) {
-                parseLatLon_set_target_loc(arr[0]);
+                } else textView_load_target.setText("no " + target_file_nm_mp3);
             }
-            target_file_nm=arr[1];
+
+            File file = new File(target_file_dir + target_file_nm + ".png");
+            target_file_nm_mp3 = target_file_dir + target_file_nm + ".mp3";
+            StringBuilder text = new StringBuilder();
+            try {
+                BufferedReader br = new BufferedReader(new FileReader(file));
+
+                String[] arr = br.readLine().split("\t");
+                //textView_load_target.setText(file.getParentFile().getAbsolutePath()+" "+arr[0]+" "+ arr[1]);
+                textView_load_target.setText(arr[0] + " " + arr[1]);
+                if (arr[0].length() != 0) {
+                    parseLatLon_set_target_loc(arr[0]);
+                }
+                target_file_nm = arr[1];
 
             /*
             String line;
@@ -273,11 +339,35 @@ public class MainActivity extends AppCompatActivity {
                 text.append('\n');
             }
             */
-            br.close();
+                br.close();
+            } catch (IOException e) {
+                textView_load_target.setText("no " + file.getAbsolutePath());
+            }
         }
-        catch (IOException e) {
-            textView_load_target.setText("no "+file.getAbsolutePath());
+        //search all files with name of lat\slon.*mp3
+        File directory = new File(target_file_dir);
+        File[] files = directory.listFiles();
+        Pattern p = Pattern.compile("([+-]?([0-9]*[.])?[0-9]+)\\s[+-]?(([0-9]*[.])?[0-9]+).*");
+        for (int i = 0; i < files.length; i++) {
+
+            String nm=files[i].getName();
+            Matcher m = p.matcher(nm);
+            if (m.matches()) {
+
+                Location l=new Location("");
+                l.setLatitude(Double.parseDouble(m.group(1))); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
+                l.setLongitude(Double.parseDouble(m.group(3)));
+
+                target_locations_to_check_each.add(l);
+                target_locations_to_check_each_mp3_nm.add(nm);
+            }
         }
+        Log.d("Files", "FileName:" + target_locations_to_check_each_mp3_nm.toString());
+       /* if (string.matches("[A-Z]{2}\\-[0-9]{1,2}\\-[A-Z]{1,2}\\-[0-9]{1,4}"))
+        {
+            // Yes it matches
+        }
+        */
     }
 
     MediaPlayer mediaPlayer=null;
@@ -352,8 +442,9 @@ void location_target_display()
         location_current_display();
         location_target_display();
 
-        distance_current_to_target_el.setText("dist: " + (distance_current_to_target==-1?"?":Double.toString(distance_current_to_target)) + ", ranges:" + range0 + " | " + range1);
-        if(distance_current_to_target!=-1) {
+        if(target_file_nm!=null) {
+            distance_current_to_target_el.setText("dist: " + (distance_current_to_target == -1 ? "?" : Double.toString(distance_current_to_target)) + ", ranges:" + range0 + " | " + range1);
+            if (distance_current_to_target != -1) {
                 if (distance_current_to_target < range0) {
                     if (inRange != 0) {
                         inRange = 0;
@@ -378,8 +469,8 @@ void location_target_display()
                     }
                 }
             }
+        }
 
-        toggleButtons();
     }
 
     @Override
@@ -484,6 +575,7 @@ void location_target_display()
                 }).check();
     }
 
+    int iii=0;
     @OnClick(R.id.btn_stop_location_updates)
     public void stopLocationButtonClick() {
         mRequestingLocationUpdates = false;
@@ -511,6 +603,35 @@ void location_target_display()
         } else {
             Toast.makeText(getApplicationContext(), "Last known location is not available!", Toast.LENGTH_SHORT).show();
         }
+
+
+
+
+        Location t = new Location("");
+        switch (iii)
+        {
+            case 0:
+                t.setLatitude(11.1); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
+                t.setLongitude(11.1);
+                break;
+            case 1:
+                t.setLatitude(11.2); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
+                t.setLongitude(11.2);
+                break;
+            case 2:
+                t.setLatitude(22.3); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
+                t.setLongitude(22.3);
+                break;
+            case 3:
+                t.setLatitude(33.33333); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
+                t.setLongitude(33.33333);
+                break;
+        }
+        if(iii<3)
+            iii++;
+
+
+        setLocation_current (t);
     }
     @OnClick(R.id.btn_loc_from_target)
     public void loc_from_target() {
