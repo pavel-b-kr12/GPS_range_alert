@@ -110,9 +110,7 @@ public class MainActivity extends AppCompatActivity {
     // location updates will be received if another app is requesting the locations
     // than your app can handle
     private static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = 5000;
-
     private static final int REQUEST_CHECK_SETTINGS = 100;
-
 
     // bunch of location related apis
     private FusedLocationProviderClient mFusedLocationClient;
@@ -130,7 +128,6 @@ public class MainActivity extends AppCompatActivity {
     public void setLocation_target(Location location_target) {
         this.location_target = location_target;
         distance_calc();
-
     }
     private float range0;
     private float range1;
@@ -156,9 +153,7 @@ public class MainActivity extends AppCompatActivity {
             if(distance<50) target_reached(i);
         }
 
-
         toggleButtons();
-
 
         updateLocationUI();
     }
@@ -190,7 +185,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
 
-        init(); // initialize the necessary libraries
+        init(); //  the necessary libraries
 
         restoreValuesFromBundle(savedInstanceState);
 
@@ -208,8 +203,6 @@ public class MainActivity extends AppCompatActivity {
                 // location is received
                 setLocation_current(locationResult.getLastLocation());
                 mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-
-
 
                 updateLocationUI();
             }
@@ -296,7 +289,6 @@ public class MainActivity extends AppCompatActivity {
     List<String> target_locations_to_check_each_mp3_nm = new ArrayList<String>();
     List<Location> target_locations_to_check_each = new ArrayList<Location>();
 
-
     private void target_file_nm_load() { // arrived to target     ///storage/sdcard0/
         if(target_file_nm!=null) {
             //play target mp3 and load next file
@@ -358,7 +350,7 @@ public class MainActivity extends AppCompatActivity {
                 l.setLatitude(Double.parseDouble(m.group(1))); //Kiev, Ukraine. Latitude: 50.4547 Longitude: 30.5238.
                 l.setLongitude(Double.parseDouble(m.group(3)));
 
-                target_locations_to_check_each.add(l);
+                target_locations_to_check_each.add(l); //TODO only first time or clear array
                 target_locations_to_check_each_mp3_nm.add(nm);
             }
         }
@@ -470,7 +462,6 @@ void location_target_display()
                 }
             }
         }
-
     }
 
     @Override
@@ -482,7 +473,6 @@ void location_target_display()
         outState.putParcelable("range0", location_current);
         outState.putParcelable("range1", location_current);
         outState.putString("last_updated_on", mLastUpdateTime);
-
     }
 
     private void toggleButtons() {
@@ -596,7 +586,7 @@ void location_target_display()
     }
 
     @OnClick(R.id.btn_get_last_location)
-    public void showLastKnownLocation() {
+    public void showLastKnownLocation_setLocation_current_test() {
         if (location_current != null) {
             Toast.makeText(getApplicationContext(), "Lat: " + location_current.getLatitude()
                     + ", Lng: " + location_current.getLongitude(), Toast.LENGTH_LONG).show();
@@ -604,9 +594,7 @@ void location_target_display()
             Toast.makeText(getApplicationContext(), "Last known location is not available!", Toast.LENGTH_SHORT).show();
         }
 
-
-
-
+        //for test
         Location t = new Location("");
         switch (iii)
         {
@@ -627,10 +615,7 @@ void location_target_display()
                 t.setLongitude(33.33333);
                 break;
         }
-        if(iii<3)
-            iii++;
-
-
+        if(iii<3)  iii++;
         setLocation_current (t);
     }
     @OnClick(R.id.btn_loc_from_target)
@@ -668,10 +653,8 @@ void location_target_display()
 
     private void openSettings() {
         Intent intent = new Intent();
-        intent.setAction(
-                Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-        Uri uri = Uri.fromParts("package",
-                BuildConfig.APPLICATION_ID, null);
+        intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        Uri uri = Uri.fromParts("package", BuildConfig.APPLICATION_ID, null);
         intent.setData(uri);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
@@ -682,9 +665,7 @@ void location_target_display()
         super.onResume();
 
         // Resuming location updates depending on button state and allowed permissions
-        if (mRequestingLocationUpdates && checkPermissions()) {
-            startLocationUpdates();
-        }
+        if (mRequestingLocationUpdates && checkPermissions()) startLocationUpdates();
 
         updateLocationUI();
     }
@@ -732,7 +713,7 @@ void parseLatLon_set_target_loc(String pasteData) {
 }
 
 
-//====================================
+//==================================== file read
 // Storage Permissions
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
     private static String[] PERMISSIONS_STORAGE = {
